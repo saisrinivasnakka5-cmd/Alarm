@@ -53,9 +53,15 @@ def index():
             flash("Please choose a valid time.", "error")
         return redirect(url_for("index"))
 
-    with connect_db() as conn:
-        meals = conn.execute("SELECT * FROM meals ORDER BY id").fetchall()
-    return render_template("index.html", meals=meals)
+    
+with connect_db() as conn:
+    meals = conn.execute(
+        "SELECT * FROM meals ORDER BY id"
+    ).fetchall()
+    meals = [dict(meal) for meal in meals]
+
+return render_template("index.html", meals=meals)
+
 
 @app.route("/api/meals")
 def api_meals():
