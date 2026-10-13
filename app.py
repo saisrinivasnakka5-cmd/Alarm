@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, redirect, url_for, flash
 import sqlite3
 import os
@@ -13,10 +14,12 @@ DEFAULT_MEALS = [
     ("Dinner", "19:30"),
 ]
 
+
 def connect_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
 
 def init_db():
     with connect_db() as conn:
@@ -28,12 +31,21 @@ def init_db():
                 enabled INTEGER NOT NULL DEFAULT 1
             )
         """)
-        count = conn.execute("SELECT COUNT(*) FROM meals").fetchone()[0]
+        count = conn.execute(
+            "SELECT COUNT(*) FROM meals"
+        ).fetchone()[0]
+
         if count == 0:
             conn.executemany(
-                "INSERT INTO meals (name, meal_time, enabled) VALUES (?, ?, 1)",
+                "INSERT INTO meals (name, meal_time, enabled) "
+                "VALUES (?, ?, 1)",
                 DEFAULT_MEALS
             )
+
+
+# Initialize SQLite when Gunicorn imports this app.
+init_db()
+
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -41,26 +53,32 @@ def index():
         meal_id = request.form.get("meal_id", type=int)
         meal_time = request.form.get("meal_time", "")
         enabled = 1 if request.form.get("enabled") == "on" else 0
+
         try:
             datetime.strptime(meal_time, "%H:%M")
+
             with connect_db() as conn:
                 conn.execute(
-                    "UPDATE meals SET meal_time = ?, enabled = ? WHERE id = ?",
+                    "UPDATE meals SET meal_time = ?, enabled = ? "
+                    "WHERE id = ?",
                     (meal_time, enabled, meal_id)
                 )
+
             flash("Meal reminder saved.", "success")
+
         except ValueError:
             flash("Please choose a valid time.", "error")
+
         return redirect(url_for("index"))
 
-    
-with connect_db() as conn:
-    meals = conn.execute(
-        "SELECT * FROM meals ORDER BY id"
-    ).fetchall()
-    meals = [dict(meal) for meal in meals]
+    with connect_db() as conn:
+        meals = conn.execute(
+            "SELECT * FROM meals ORDER BY id"
+        ).fetchall()
 
-return render_template("index.html", meals=meals)
+        meals = [dict(meal) for meal in meals]
+
+    return render_template("index.html", meals=meals)
 
 
 @app.route("/api/meals")
@@ -69,8 +87,13 @@ def api_meals():
         meals = conn.execute(
             "SELECT id, name, meal_time, enabled FROM meals ORDER BY id"
         ).fetchall()
-    return {"meals": [dict(m) for m in meals]}
+
+    return {"meals": [dict(meal) for meal in meals]}
+
 
 if __name__ == "__main__":
-    init_db()
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 5000)),
+        debug=False
+    )
